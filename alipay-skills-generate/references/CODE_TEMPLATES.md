@@ -494,7 +494,7 @@ skill.registerAPI('apiName2', apiName2);
     },
     {
       "name": "getOrderDetail",
-      "description": "获取单个订单详情。当上下文已有真实 orderId 且用户询问订单详情、商品明细或物流状态时使用。",
+      "description": "获取单个订单详情。当上下文已有真实 orderId 且用户询问订单详情、商品明细或物流状态时使用；不用于订单列表筛选或商品搜索。",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -559,11 +559,11 @@ skill.registerAPI('apiName2', apiName2);
 | apis[]._meta.ui.componentPath | 可选 | 接口成功后渲染的组件，不带扩展名，格式固定为 `components/{name}/index` |
 | components[].path | 是 | 组件路径 |
 | components[].relatedPage | 是 | 关联原小程序页面；自定义 CTA 主动打开时在 tap handler 调用 `vctx.openRelatedPage()` |
-| components[].permissions["scope.dynamic"] | 按需 | 组件需要直接 `my.request` 或 setTimeout/setInterval 等定时器时声明；`desc` 必须写清请求数据、刷新触发方式或定时器用途 |
+| components[].permissions["scope.dynamic"] | 按需 | 组件需要直接 `my.request`、`my.tradePay` 或 setTimeout/setInterval 等定时器时声明；`desc` 必须写清请求数据与刷新方式、支付用途或定时器用途 |
 | components[].expirable | 建议 | 动作类/时效类设 true |
 | components[].expiredText | 条件 | expirable=true 时必填 |
 
-确需动态请求或定时器时，只在对应 component 增加：
+确需动态请求、支付或定时器时，只在对应 component 增加：
 
 ```json
 "permissions": {
@@ -573,13 +573,23 @@ skill.registerAPI('apiName2', apiName2);
 }
 ```
 
-`desc` 不得只写「需要网络」或「动态能力」。声明 `scope.dynamic` 后，该组件按动态组件判定：可在 Gate D 直接请求契约内调用 `my.request` 和定时器；仍不得调用 `my.getAuthCode`、WebSocket、上传下载或其他未在动态组件支持列表中的 API。
+`desc` 不得只写「需要网络」或「动态能力」。声明 `scope.dynamic` 后，该组件按动态组件判定：可在 Gate D 直接请求/支付契约内调用 `my.request`、`my.tradePay` 和定时器；仍不得调用 `my.getAuthCode`、WebSocket、上传下载或其他未在动态组件支持列表中的 API。`my.tradePay` 只能由明确付款 CTA 的 tap handler 调用，且必须使用源码真实支付参数并保留平台最终确认。
+
+### description 与 schema 生成规则
+
+- 接口 `description` 首句写动作和具体业务对象，例如「搜索饮品」「获取单个订单详情」；不得以关键词、状态、时间等入参维度开头，也不得使用「商品」「处理」等覆盖多个接口的宽泛对象。
+- 接口 `description` 只写功能、调用时机和不适用场景，不写鉴权、请求顺序、响应解包等内部实现。多个接口的职责不得包含或语义重叠。
+- 每个 `inputSchema.properties.*` 都提供非空 `description`。普通字段需要举例时给多个不同样本，并明确用户未提供、表达模糊或不适用时应省略、追问、使用约定默认值还是改走其他接口；不要只给一个例子。
+- ID 类字段必须写明上游接口及字段路径，并明确禁止从自然语言推断或使用示例值。上游来源不存在时先调用生产接口或让用户选择，不调用当前接口。
+- 用户可控参数存在合理静态边界时直接写入 JSON Schema：自由文本使用 `minLength`/`maxLength`，金额、数量、固定时间范围使用 `minimum`/`maximum` 或等价边界，固定选项使用 `enum`。无法预知合理上限的分页/批量参数及完全由可信上下文派生的只读内部字段可不设固定上限，但实现必须依赖后端限制或分批处理。
+- `inputSchema` 不得暴露 `apiKey`、`secret`、`token`、`password`、`accessKey` 等凭据字段；鉴权凭据从源码确认的 storage、统一请求层或接口私有安全上下文取得，不进入 Agent 对话。
+- `outputSchema` 只描述 Agent 可见的 `structuredContent`；敏感原值只在组件或宿主确需时放入 `_meta.private`，不在 outputSchema 中声明。
 
 ---
 
 ## §5 SKILL.md 模板
 
-`SKILL.md` 是给智能体使用的路由和执行说明。它不复制完整 schema，但必须写清触发边界、拒绝边界、接口选择、参数抽取、执行 SOP、异常出口和结果处理，并与 `mcp.json`、`index.js`、真实 API 实现保持一致。生成时按下列结构写，避免遗漏。
+`SKILL.md` 的唯一读者是智能体。它只写会改变智能体理解、接口选择、参数提取、分支决策或用户回应的路由和执行说明，不复制完整 schema，也不写组件布局/配色、项目背景/验收/排期或宣传文案。它必须写清触发边界、拒绝边界、接口选择、参数抽取、执行 SOP、异常出口和结果处理，并与 `mcp.json`、`index.js`、真实 API 实现保持一致。生成时按下列结构写，避免遗漏。
 
 ```markdown
 ---
@@ -595,10 +605,10 @@ version: 1.0.0
 
 ## 能力边界
 
-| 支持能力 | 推荐接口 | 说明 |
-|---|---|---|
-| 查询待办列表 | `listTodos` | 可按状态筛选 |
-| 更新待办状态 | `updateTodo` | 只更新已确认的单条待办 |
+| 支持能力 | 适用边界 |
+|---|---|
+| 查询待办列表 | 支持按已有状态分类查询；未指定状态时查询全部 |
+| 更新待办状态 | 只更新已从可信候选中定位并经用户确认的单条待办 |
 
 | 不支持场景 | 处理方式 |
 |---|---|
@@ -621,6 +631,11 @@ version: 1.0.0
 - 更新状态前先根据会话候选或用户给出的标题定位单条待办；多候选时先补问。
 - 用户说"第二个""刚才那个"时，先用会话中可见序号和标题解析到接口需要的内部 `id`，不要求用户提供 `id`。
 
+## 对话式承接
+- 用户说"最近该先做什么"等模糊需求时，先调用 `listTodos(status=todo)`，再依据接口真实返回向用户呈现候选；无结果时不编造推荐。
+- 用户在已定位单条待办后说"改回未完成"时，复用该候选的 `id` 并把 `status` 映射为 `todo`；候选已过期或不唯一时重新查询或追问。
+- 状态更新完成后，以 `updateTodo` 的结果或重新调用 `listTodos` 得到的状态为准，不沿用更新前卡片。
+
 ## 执行流程
 1. 判断用户意图是否属于能力边界；若属于不支持场景，按拒绝规则回复并结束。
 2. 若用户要查询列表，调用 `listTodos`；若 `success=false`，返回错误原因并提示用户稍后重试；若 `total=0`，告知暂无匹配待办并提示换条件。
@@ -631,8 +646,8 @@ version: 1.0.0
 
 | 流程步骤 | MCP 工具 | 说明 |
 |---|---|---|
-| 查询待办列表 | `listTodos` | 对应 `mcp.json#apis[].name` |
-| 更新待办状态 | `updateTodo` | 对应 `mcp.json#apis[].name` |
+| 查询待办列表 | `listTodos` | 无前置；其返回的 `items[].id` 供 `updateTodo` 使用 |
+| 更新待办状态 | `updateTodo` | 前置为已唯一定位 `listTodos.items[].id`，完成后可重新调用 `listTodos` 校准 |
 
 ## 参数规范
 - `status`：string，选填，枚举 `todo`、`done`、`all`；用户说"没做完""待处理"映射为 `todo`，"做完了""完成的"映射为 `done`，未指定时用 `all`。
@@ -644,10 +659,13 @@ version: 1.0.0
 - `total=0` 或列表为空：告知没有匹配结果，引导用户更换状态或关键词。
 - 未登录或未授权：提示用户完成登录授权后重试，不执行更新类接口。
 - 缺少内部 `id`：先调用查询接口或让用户选择候选，不直接调用更新接口。
+- 用户在多步操作中取消：立即停止后续工具调用，不保留待执行确认；已提交动作先查询权威状态再说明结果。
+- 请求超时或结果未知：不得直接重试写操作；先查询最新状态，确认未生效后再让用户决定是否重试。
 
 ## 结果处理
 - 成功查询时可展示列表卡片。
 - `isError=true` 时不渲染组件，按 `content` 引导用户补充业务信息。
+- 工具无返回、查询失败或证据不足时如实告知当前无法确认，不得编造待办、状态或执行结果。
 
 ## 端到端示例
 - 正常流程：用户说"还有哪些没做完的任务" -> 调用 `listTodos(status=todo)` -> 展示待办列表。
@@ -659,6 +677,8 @@ version: 1.0.0
 
 - YAML frontmatter：`name`、`displayName`、`description`、`version` 必填；`brandName`、`category`、`owner`、`updated` 按项目事实补充。`description` 必须同时包含核心能力、触发词或用户说法、至少 1 条不支持边界。
 - 能力边界：同时写支持范围和不支持范围；不支持范围不能与支持范围矛盾。
+- 内容读者：只保留能影响 Agent 理解、决策或输出的业务事实和执行指令；禁止写卡片布局、配色、字段位置等视觉设计稿，禁止写需求背景、验收、排期等项目管理内容，禁止写对外宣传文案。
+- 信息归位：单接口的功能、调用时机和不适用场景只在 `mcp.json#apis[].description` 完整定义；业务 `SKILL.md` 的工具清单只写前置条件、上游字段来源和下游关系。跨多个接口的顺序、状态和业务规则写在业务 `SKILL.md`，不塞进单个接口 description。
 - 安全与用户承接边界：把「Agent 可执行」和「用户可继续」分开描述。R3/R4 动作若 `userCanPerform=true`，用查询、详情或 handoff API 承接自然语言意图并返回最新摘要和 CTA，写成「不由 Agent 自动执行，通过卡片 CTA 交半屏/原页面/平台流程确认」，不得设置 `agentEntry=none`、归入笼统的「不支持」或删除用户出口。
 - 拒绝规则：每条不支持或越界场景都写清拒绝条件和用户可见回应话术。
 - 触发条件：覆盖关键词、口语句式、追问承接，至少覆盖主要能力的正例和反例。
@@ -666,13 +686,14 @@ version: 1.0.0
 - 示例 Query 和端到端示例中的工具调用必须展开完整参数；凡 `mcp.json#apis[].inputSchema.required` 中的字段，示例调用中必须出现。参数来自上游结果时，必须写明字段名或字段路径，禁止只写 `addCartItem(quantity=1)`、`receiveCoupon(confirmed=true)` 这类省略关键 ID 的调用。
 - 上游结果以判别字段选择下游接口或参数组合时，示例必须先读取该字段，再展示对应分支的完整调用。只有上游所有可能结果都由同一调用契约覆盖时，才能直接写“第一个结果 → 调用详情接口”。
 - 接口选择策略：多个接口之间的选择顺序；依赖内部 ID 的接口必须写明上游来源和候选歧义处理。
+- 对话式承接：仅在业务适用且有源码/API 证据时，写清模糊意图如何澄清或推荐、规格/时间/地点等字段如何用自然语言修改、历史记录或个人资产如何查询后操作、订单或服务进程如何重新查询或动态更新。不适用时省略，不得编造接口能力。
 - 执行流程：用步骤编号写首尾相连的 SOP；每个条件分支必须有终止动作、跳转目标或用户引导，不允许悬空；handoffOnly 场景必须写明生成 CTA 的 `agentEntry`、传入页面的上下文、页内目标和返回后的查询入口，且不在承接前创建订单、锁库存、占名额、提交申请、生成待支付记录或改变账户状态。
-- 用户旅程：按 Gate D 总体用户动线写明本 Skill 承担的步骤和跨 Skill 相邻步骤；每个中间态结果写明主要下一动作、下一 `agentEntry/uiEntry`、完成或恢复方式，以及 `userCanPerform`、`agentMayExecute`、`ctaRequired`、`executionFeasibility` 和 `freshnessPolicy`。`agentEntry` 是 Agent 处理自然语言意图时首先调用的已注册 API，可直接执行或返回确认/页面承接 CTA；不得仅因最终动作需要用户手势或原页面而写成 `none`。UI 入口按 `JSAPI_BOUNDARY.md §3.2.1/§3.4` 独立裁决：已有 session 执行路径的全部传递依赖均受组件支持且需要原位执行时使用 `my.request`；路径到达组件侧不支持依赖且意图和参数完整时使用 `apiCall(<apiName>)`；需要补参、语义理解或跨能力编排时使用 `followUpText`。
+- 用户旅程：按 Gate D 总体用户动线写明本 Skill 承担的步骤和跨 Skill 相邻步骤；每个中间态结果写明主要下一动作、下一 `agentEntry/uiEntry`、完成或恢复方式，以及 `userCanPerform`、`agentMayExecute`、`ctaRequired`、`executionFeasibility` 和 `freshnessPolicy`。`agentEntry` 是 Agent 处理自然语言意图时首先调用的已注册 API，可直接执行或返回确认/页面承接 CTA；不得仅因最终动作需要用户手势或原页面而写成 `none`。UI 入口按 `JSAPI_BOUNDARY.md §3.2.1/§3.4` 独立裁决：已有 session 执行路径的全部传递依赖均受组件支持且需要原位执行时使用 `my.request`；满足动态支付严格契约时使用 `tradePay`；路径到达组件侧不支持依赖且意图和参数完整时使用 `apiCall(<apiName>)`；需要补参、语义理解或跨能力编排时使用 `followUpText`。
 - 状态一致性：业务 SKILL.md 必须写明服务端是唯一事实源。`uiEntry=my.request` 以写响应或随后查询结果校准当前卡片，`uiEntry=apiCall` 以原子接口新 Result 校准；Agent 后续结算、计算金额、批量修改或下单前必须重新查询，不得沿用旧卡的数量、金额或勾选状态。
 - 参数规范：类型、必填/选填、枚举取值、口语到枚举映射、内部字段来源和参数提取示例；`confirmed=true` 必须说明来自明确表达后果的用户输入或组件动作，弱语义按钮不得自动产生确认。
 - 工具映射：正文和 SOP 中提到的 MCP 工具名必须与 `mcp.json#apis[].name` 完全一致，不多写不存在工具，不漏写必要工具。
-- 异常处理：至少覆盖接口失败、查询为空、未登录/未授权；涉及支付时必须覆盖 `needPay=false` 零元分支。
-- 结果处理：成功如何回答、何时展示组件、失败时如何引导下一步；`ctaRequired=true` 时写明卡片中的可见确认或 handoff 入口，`relatedPage` CTA 必须由用户 tap 调用 `openRelatedPage()`，仅配置关联页不算完整入口；页面返回后明确重新调用哪个查询 API，继续状态变更、金额计算、结算或下单前不得沿用旧卡；敏感原值只能说明放在 `_meta.private` 供组件使用，不得写入 Agent 可见的 `structuredContent` 或 `content.text`；状态变更后刷新失败必须说明操作可能已提交但刷新失败。
+- 异常处理：至少覆盖接口失败、查询为空、首次使用、无历史/缓存、未登录/未授权和缺少门店/商品/订单等强依赖状态；多步或状态变更流程还要覆盖用户取消、中断、超时和结果未知，说明是否停止、清理、补参、重查或允许重试；涉及支付时必须覆盖 `needPay=false` 零元分支以及付款取消、失败和状态未知。
+- 结果处理：成功如何回答、何时展示组件、失败时如何引导下一步；明确工具无返回、查询失败或证据不足时如实告知，禁止编造业务结果；`ctaRequired=true` 时写明卡片中的可见确认或 handoff 入口，`relatedPage` CTA 必须由用户 tap 调用 `openRelatedPage()`，仅配置关联页不算完整入口；页面返回后明确重新调用哪个查询 API，继续状态变更、金额计算、结算或下单前不得沿用旧卡；敏感原值只能说明放在 `_meta.private` 供组件使用，不得写入 Agent 可见的 `structuredContent` 或 `content.text`；状态变更后刷新失败必须说明操作可能已提交但刷新失败。
 
 ---
 
@@ -719,7 +740,7 @@ description: <小程序服务范围、主要用户意图和 Skill 路由摘要>
 
 - 金额、库存、状态和资格只引用接口真实返回；失败或证据不足时不得编造。
 - 敏感信息只展示完成任务所需的最小摘要。
-- <项目要求的回答风格和卡片使用方式。>
+- <项目要求的语气、简洁度和卡片使用条件；不规定表格、JSON、固定标题等回复格式。>
 
 ## 猜你想问引导
 
@@ -733,6 +754,9 @@ description: <小程序服务范围、主要用户意图和 Skill 路由摘要>
 3. Gate D 总体用户动线中的每个用户意图都能路由到已注册 API；R3/R4 页面承接意图不能因 Agent 不直接执行而缺少路由。
 4. 只写跨 Skill 路由、调用顺序和共性行为，不复制完整 input/output schema 或业务 `SKILL.md`。
 5. 已有 instruction 文件时保留与本次生成无关的人工规则，避免整文件覆盖造成行为回退。
+6. 不包含「忽略以上指令」「无视前面的规则」「你现在是」等试图覆盖模型基础行为的内容。
+7. 只约束回答应包含的业务信息、真实性、语气和简洁度，不强制表格、JSON、固定标题或其他呈现格式。
+8. 从全部最终 `mcp.json` 汇总 API 名，逐字检查 instruction 中引用的 method 名，大小写和拼写必须完全一致。
 
 ### 7.2 app.json 最小集成配置
 
@@ -749,7 +773,7 @@ description: <小程序服务范围、主要用户意图和 Skill 路由摘要>
     "skills": [
       {
         "name": "my-skill",
-        "description": "Skill 简要描述，50-120 中文字符，说明功能范围和主要能力",
+        "description": "具体业务对象 Skill，支持哪些能力。用户有哪些说法时使用；不用于哪些相邻场景。",
         "path": "skills/my-skill"
       }
     ]
@@ -772,12 +796,12 @@ description: <小程序服务范围、主要用户意图和 Skill 路由摘要>
     "skills": [
       {
         "name": "product-search",
-        "description": "商品搜索服务 Skill，支持搜索商品、查看商品详情、查询库存价格和打开关联商品页面。",
+        "description": "鲜果商品搜索 Skill，支持搜索鲜果、查看商品详情和查询库存价格。用户询问水果、价格或库存时使用；不用于订单和优惠券查询。",
         "path": "skills/product-search"
       },
       {
         "name": "order-query",
-        "description": "订单查询服务 Skill，支持查询订单列表、查看订单详情和跟进配送状态。",
+        "description": "订单查询 Skill，支持查询订单列表、查看订单详情和跟进配送状态。用户询问我的订单、物流或取货状态时使用；不用于商品搜索。",
         "path": "skills/order-query"
       }
     ]
@@ -796,7 +820,7 @@ description: <小程序服务范围、主要用户意图和 Skill 路由摘要>
 | 字段 | 必填 | 说明 |
 |------|------|------|
 | name | 是 | 与 SKILL.md front matter name 完全一致 |
-| description | 是 | Skill 简要描述，建议 50-120 中文字符，硬上限 200 中文字符或 400 字节 |
+| description | 是 | Skill 简要描述，建议 50-120 中文字符，硬上限 200 中文字符或 400 字节；包含具体业务对象、核心能力、常见用户说法或触发词和至少一条不支持边界，避免宽泛表述 |
 | path | 是 | Skill 目录相对路径，必须隶属于 `subPackages` 中某个分包 |
 
 ### 7.5 集成步骤
@@ -806,6 +830,6 @@ description: <小程序服务范围、主要用户意图和 Skill 路由摘要>
 3. 保留已有 `subPackages`，确保存在覆盖本次生成的所有 Skill 目录的分包声明，例如 `{ "root": "skills", "pages": [] }`
 4. `agent.skills[].path` 必须隶属于某个 `subPackages[].root`，且该分包 `pages` 必须为空数组
 5. 保留已有 `agent.skills`，新增或更新本次生成的所有 Skill 项
-6. `skills[].description` 必填，保持与 `SKILL.md` 能力范围一致但更简短
+6. `skills[].description` 必填，保持与 `SKILL.md` 能力范围一致但更简短，并与其他 Skill description 做语义去重，避免同一 query 同时匹配多个 Skill
 7. 核对 instruction 中引用的所有 Skill/API 均已注册，并确认文件不超过 10000 字节
 8. `lazyCodeLoading` 与 `component2` 是接入前置项，缺失时记录为待补

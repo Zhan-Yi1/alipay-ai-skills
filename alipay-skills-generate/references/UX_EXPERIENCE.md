@@ -19,7 +19,7 @@ loadTiming: Gate D/E
 
 ## §2 硬边界
 
-1. 默认原子组件不得调用 `my.request` 或 `my.getAuthCode`。声明 `scope.dynamic` 的动态组件可以按体验决策调用 `my.request` 和定时器，包括在用户 tap 中直接执行读写请求；动态组件仍不得调用 `my.getAuthCode` 或其他未支持 API。
+1. 默认原子组件不得调用 `my.request`、`my.tradePay` 或 `my.getAuthCode`。声明 `scope.dynamic` 的动态组件可以按体验决策调用 `my.request`、`my.tradePay` 和定时器，包括在用户 tap 中直接执行读写请求；动态组件仍不得调用 `my.getAuthCode` 或其他未支持 API。`my.tradePay` 只用于用户明确点击付款 CTA 后进入平台支付确认。
 2. Agent 入口与 UI 入口分别裁决。确定性点击需要原位请求，且请求实现及全部传递依赖均受组件支持时使用 `my.request`；否则操作意图和参数完整且目标 API 已注册时使用 `apiCall`，需要补参、语义理解或跨能力编排时使用 `followUpText`。`apiCall` 的参数必须来自接口结果、dataset、组件 data、`_meta`、页面 query 或用户已确认输入。
 3. `relatedPage` 的 `query` 必传；`path` 如传入，必须来自源码中的 `navigateTo` / `redirectTo` / `switchTab` 等真实页面路径，不得编造。组件先调用 `setRelatedPage({ path?, query })` 配置目标，再在用户 tap handler 中调用 `openRelatedPage()` 打开。
 4. `detailPage` 表示组件通过 `vctx.openDetailPage({ url })` 打开半屏承载页，路径必须来自源码真实页面或 `app.json` 注册页面。
@@ -95,7 +95,7 @@ Gate D 先在现有 `design.md` 中按代表性自然语言目标写出“用户
 
 组件运行时：
 - `componentRuntime`: `atomic` / `dynamic`
-- `dynamicReason`: <仅 dynamic 必填；说明直接请求或定时器为何必要；使用 my.request 时同时写明复用的 utils 业务函数、依赖闭包、请求证据、触发方式、服务端校准和失败恢复>
+- `dynamicReason`: <仅 dynamic 必填；说明直接请求、支付或定时器为何必要；使用 my.request 时同时写明复用的 utils 业务函数、依赖闭包、请求证据、触发方式、服务端校准和失败恢复；使用 tradePay 时写明支付参数来源、付款 CTA、平台确认和结果恢复>
 
 源码证据：
 - <页面、事件、接口、跳转、确认弹窗、错误处理等证据>
@@ -111,7 +111,7 @@ Gate D 先在现有 `design.md` 中按代表性自然语言目标写出“用户
 |------|----------|------|----------|-------------|----------|------------|----------|------|
 | 查看详情 | 列表项 | onTap=goDetail | item.id | R0 | 低 | apiCall 或 relatedPage | 是 | 参数可靠，能继续查看详情 |
 | 加入购物车 | 商品 | addCart 接口 | skuId、quantity | R2 | 低 | 动态组件 `my.request`、apiCall 或 Agent 对话入口 | 是 | 参数完整时由动态组件直接请求或调用已注册 API，并以服务端状态更新卡片 |
-| 付款 | 订单 | pay 页面跳转 | orderId、amount | R4 | 高 | detailPage | 是 | 仅展示付款入口，由用户点击打开原小程序页面完成支付 |
+| 付款 | 订单 | pay 页面跳转或源码 `my.tradePay` | orderId、amount、源码支付参数 | R4 | 高 | tradePay、detailPage 或 relatedPage | 是 | 仅展示付款入口；满足动态支付契约时由用户点击进入平台支付确认，否则由原页面完成 |
 
 最终体验：
 - 卡片展示：<展示哪些关键字段>
@@ -142,9 +142,11 @@ Gate D 先在现有 `design.md` 中按代表性自然语言目标写出“用户
 
 卡片上的用户操作另行裁决 `uiEntry`；是否存在 Agent API 不自动决定 UI 入口。确定性点击需要在当前卡片原位完成读写时，按 `JSAPI_BOUNDARY.md §3.2.1` 检查执行路径事实，再按 `JSAPI_BOUNDARY.md §3.4` 裁决入口。已有 session 执行路径的全部传递依赖均受组件支持，且业务 URL、method、header、后端参数映射和响应信封已收口到 `utils/` 业务函数时，必须使用动态组件 `uiEntry=my.request`；同一操作存在 Agent API 时必须复用该函数。两端可以分别保留对话参数编排和 UI 状态编排，组件不得 import 原子接口 handler。
 
-`uiEntry` 只描述用户点击后如何执行，不决定控件形态。先根据源交互映射确定点击区域、控件形态、事件关系和状态反馈，再选择 `localState`、`my.request`、`apiCall`、`detailPage`、`relatedPage`、`followUpText` 或 `none`；不得因存在 API 或出口就自动生成独立按钮、链接或其他可见入口。
+`uiEntry` 只描述用户点击后如何执行，不决定控件形态。先根据源交互映射确定点击区域、控件形态、事件关系和状态反馈，再选择 `localState`、`my.request`、`tradePay`、`apiCall`、`detailPage`、`relatedPage`、`followUpText` 或 `none`；不得因存在 API 或出口就自动生成独立按钮、链接或其他可见入口。
 
 `uiEntry=my.request` 表示动态组件在 tap handler 中直接或通过全部传递依赖均受组件支持的 `utils/` 业务函数调用平台请求，不发送上行消息。只有当前动作的已有 session 执行路径本身必然到达 `my.getAuthCode`、主动 token 换取或刷新、接口侧专属 JSAPI、接口私有状态或不可向组件暴露的凭证，或者直连会复制敏感请求逻辑时，才改用上行消息；项目或接口侧存在主动鉴权不是否决动态组件的证据。UI 意图和参数完整且目标 API 已注册时使用 `apiCall` 发送确定的 API 名和参数，Agent 不再做业务选择；任务仍需补参、语义理解或跨能力编排时使用 `followUpText`。不得把明确的加减、勾选、收藏或切换操作改写成待 Agent 重新理解的自然语言请求。
+
+`uiEntry=tradePay` 表示动态组件在用户点击明确付款 CTA 后调用 `my.tradePay`。只在源码存在真实支付链、最新结果包含订单/商户/金额摘要与全部支付参数、平台仍提供最终支付确认时使用；调用前不得由 Agent 或组件代替用户确认，调用后必须区分成功、用户取消、明确失败和结果未知，并通过已注册查询 API 重查权威订单状态。条件不完整时改用 `detailPage` 或 `relatedPage`。
 
 源页面使用整项点击、图标、步进器、Tab、筛选项、开关、选项或展开区时，在原子组件能力范围内沿用该交互载体。确需改变时，在允许差异中写明依据、影响和替代方式。
 
@@ -160,6 +162,7 @@ Gate D 先在现有 `design.md` 中按代表性自然语言目标写出“用户
 | `relatedPage` | 先通过 `vctx.setRelatedPage({ path?, query })` 配置目标，`query` 必传、`path` 如传入则来自源码真实页面，再由用户点击调用 `vctx.openRelatedPage()` 打开 |
 | `localState` | 只改变组件内展示状态，如展开收起、Tab、临时筛选和本地选中，不改变服务端状态 |
 | `my.request` | 仅动态组件使用；在 tap handler 中直接或通过全部传递依赖均受组件支持的 `utils/` 业务函数执行有源码证据的读写请求，不发送上行消息，并以服务端状态校准组件 |
+| `tradePay` | 仅动态组件使用；用户点击明确付款 CTA 后调用源码真实 `my.tradePay` 链路进入平台支付确认，完成后重查权威订单状态 |
 | `apiCall(<apiName>)` | UI 已表达完整操作意图，发送精确 `api/call` 调用指定的已注册 API；不再让 Agent 选择接口、解释意图或重复确认 |
 | `followUpText` | 只发送自然语言上行消息，将仍需补参、语义理解、确认意图或跨能力编排的任务返回 Agent 流程 |
 | `none` | 终态展示，无可操作出口 |
@@ -174,10 +177,11 @@ Gate D 先在现有 `design.md` 中按代表性自然语言目标写出“用户
 | 操作意图和参数完整，但已有 session 执行路径到达组件侧不支持依赖 | 使用 `apiCall(<apiName>)` 上行调用已注册接口；点击后进入提交态并等待新 Result |
 | 缺少必要参数，或需要语义理解、跨能力编排 | 使用 `followUpText` |
 | 信息较多且已有页面可承载详情或确认 | 使用 `detailPage` |
-| 购物结算、下单、付款等已有真实小程序页面 | 半屏可行时优先 `detailPage`，用户在原页面完成；核心流程被拦截或缺上下文时降级为 `relatedPage` |
+| 购物结算、下单等已有真实小程序页面 | 半屏可行时优先 `detailPage`，用户在原页面完成；核心流程被拦截或缺上下文时降级为 `relatedPage` |
+| 付款且源码存在真实 `my.tradePay` 链路、支付参数完整、平台保留最终确认 | 使用动态组件 `tradePay`；否则使用 `detailPage` 或 `relatedPage` |
 | 涉及半屏不支持的插件、地图上下文或跨页路由 | 使用可靠 `relatedPage` |
 | R3 不允许 Agent 自动执行但组件可完整确认和提交 | 展示具体确认信息后，由确认 tap 使用动态组件 `my.request`、`apiCall` 或可靠页面承接 |
-| R4 不允许 Agent 执行但用户仍可继续 | 保留可见 CTA，优先验证 `detailPage`，不可行再使用 `relatedPage` |
+| R4 不允许 Agent 执行但用户仍可继续 | 保留可见 CTA；支付满足 `tradePay` 契约时可由用户点击进入平台确认，其他场景优先验证 `detailPage`，不可行再使用 `relatedPage` |
 | 需要用户补条件、确认意图或进行自然语言选择 | 使用 `followUpText` |
 | 当前结果就是终点，或没有可靠下一步 | 使用 `none`，并说明原因 |
 
@@ -190,10 +194,10 @@ Gate D 先在现有 `design.md` 中按代表性自然语言目标写出“用户
 1. 按展示重点裁剪字段，长内容用半屏或 relatedPage 承接。
 2. 动作组织服从总体用户动线、体验决策记录和源交互映射；突出当前目标的主要下一动作，次要动作按需收纳，模板阶段仅实现记录内动作及其约定的点击区域、控件形态和事件关系。
 3. `apiCall` 的接口名和参数必须来自当前 Skill 的真实契约与数据源；组件不得复制业务 URL、鉴权或请求映射，也不得把确定性操作改写成待 Agent 理解的自然语言任务。
-4. 使用 `uiEntry=my.request` 的组件必须设置 `componentRuntime=dynamic`、声明 `scope.dynamic`，并递归确认所复用 `utils/` 的全部传递依赖符合组件运行时边界。请求可以读写。R2 写操作由用户 tap 触发；R3 必须先展示具体确认信息，再由确认 tap 触发；两者都要进入提交态、防重复触发，并以写响应或后续查询的服务端状态校准。失败时保留或恢复旧数据并展示恢复出口。R4 最终资金/身份动作不得由组件直接请求完成，不得用定时器发起写操作。
+4. 使用 `uiEntry=my.request` 或 `uiEntry=tradePay` 的组件必须设置 `componentRuntime=dynamic`、声明 `scope.dynamic`。`my.request` 的复用依赖闭包必须符合组件运行时边界；请求可以读写，R2 由用户 tap 触发，R3 先展示具体确认信息再由确认 tap 触发，并具备提交态、防重复、服务端校准和失败恢复。R4 身份/关键资料动作不得由组件直接请求；付款仅在 `uiEntry=tradePay` 的严格契约下由用户点击进入平台确认。定时器不得发起写操作或支付。
 5. `localState` 只用于无需网络的组件展示状态。需要业务请求的控件按原位交互需求、当前动作的可达依赖和意图完整度选择动态组件 `my.request`、`apiCall`、`followUpText` 或可靠页面承接，并实现对应的提交态、防重复触发、服务端校准、失败恢复和旧卡过期。
 6. 登录/授权承接只能基于源码中确认的入口、接口或页面路径生成；源码使用独立登录能力时，受保护业务组件只显示鉴权失败状态，不复制登录流程。
-7. 动作执行策略遵循 SAFETY_POLICY：R2 需要原位执行且已有 session 执行路径的全部传递依赖均受组件支持时，必须由动态组件调用 `my.request`；只能由接口侧安全执行时使用 `apiCall`。R3 展示具体确认信息后可由确认 tap 使用动态组件 `my.request`、`apiCall` 或页面承接执行；R4 只提供用户点击触发的原页面/平台承接入口。
+7. 动作执行策略遵循 SAFETY_POLICY：R2 需要原位执行且已有 session 执行路径的全部传递依赖均受组件支持时，必须由动态组件调用 `my.request`；只能由接口侧安全执行时使用 `apiCall`。R3 展示具体确认信息后可由确认 tap 使用动态组件 `my.request`、`apiCall` 或页面承接执行；R4 只提供用户点击触发的平台支付或原页面承接入口，满足严格支付契约时平台入口可为动态组件 `tradePay`。
 8. 空态、失败态、过期态必须有处理；不一定生成复杂 UI，但不能留下可误触的旧操作。
 9. 如果组件无法可靠表达完整流程，保留关键摘要并提供合理承接，不强行复刻原页面。
 10. `ctaRequired=true` 时必须实现清晰可见的继续操作出口；`relatedPage` CTA 必须在 tap handler 中调用 `openRelatedPage()`，不得用隐藏元数据、单独配置、`followUpText` 或拒绝文案代替。对应自然语言意图必须能通过 `agentEntry` 生成同一承接结果。
@@ -202,7 +206,7 @@ Gate D 先在现有 `design.md` 中按代表性自然语言目标写出“用户
 
 - [ ] 每个 Gate A 自然语言目标都有首尾相连的总体用户动线，包含完成条件；跨 Skill 字段与页面承接后的重查入口明确。
 - [ ] 每个有 UI 的 API 都有体验决策记录，并作为体验契约使用。
-- [ ] 每个组件已裁决 `componentRuntime`；使用 `my.request` 的组件为动态组件并声明 `scope.dynamic`，其 `utils/` 复用链、全部传递依赖、URL/method、参数、响应和失败恢复均有源码证据。
+- [ ] 每个组件已裁决 `componentRuntime`；使用 `my.request` 或 `my.tradePay` 的组件为动态组件并声明 `scope.dynamic`。请求的 `utils/` 复用链、全部传递依赖、URL/method、参数、响应和失败恢复均有源码证据；支付的参数来源、CTA、平台确认和结果重查均有源码与契约依据。
 - [ ] 每个总体范围内的源可见动作都有源点击区域、控件形态、事件关系、参数来源和目标承接方式的映射。
 - [ ] 上游结果的每个源码可达判别值都有对应的 Agent 调用链、真实参数路径和独立 UI 入口裁决；用户明确要求的查询或详情能力未被页面承接替代。
 - [ ] 每个中间态结果都有主要下一动作和下一入口；`userCanPerform=true` 的 R3/R4 动作未因禁止自动执行而丢失 CTA。
@@ -214,7 +218,7 @@ Gate D 先在现有 `design.md` 中按代表性自然语言目标写出“用户
 - [ ] Agent 入口与 UI 入口分别裁决；需要原位执行且已有 session 执行路径的全部传递依赖均受组件支持时使用 `uiEntry=my.request`，请求契约已收口到 `utils/`，同一操作存在 Agent API 时共同复用，UI 点击不发送上行消息。
 - [ ] 没有因项目、`auth-spec.md`、登录模块或原子接口 handler 中存在 `my.getAuthCode` 而全局否决动态组件；因鉴权使用 `apiCall` 时已写出从组件 tap 到首个组件侧不支持依赖的可达调用链。
 - [ ] R1 控件使用 `localState`；已有 session 执行路径的全部传递依赖均受组件支持时，原位操作使用 `my.request`；路径到达组件侧不支持依赖、意图和参数完整且目标 API 已注册时使用 `apiCall`，确需补参或推理时使用 `followUpText`，且已有提交态、防重复触发、服务端校准、失败恢复和后续重查。
-- [ ] 普通组件未调用 `my.request`；动态组件已声明 `scope.dynamic`，且没有调用 `my.getAuthCode`、用定时器写入或超出请求契约。
+- [ ] 普通组件未调用 `my.request` 或 `my.tradePay`；动态组件已声明 `scope.dynamic`，且没有调用 `my.getAuthCode`、用定时器写入/支付或超出请求与支付契约。
 - [ ] `relatedPage` 路径来自源码真实跳转；页面承接写明上下文、页内目标及返回后的查询入口。
 - [ ] 每个状态变更动作都有 safetyLevel、参数来源、确认/承接策略；R2 未被交易链路误降级，R4 未被自动执行。
 - [ ] 保留和不生成的动作都有理由。

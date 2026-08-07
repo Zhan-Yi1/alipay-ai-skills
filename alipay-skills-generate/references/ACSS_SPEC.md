@@ -121,7 +121,7 @@ order
 
 - 不用 `display: grid`、`display: table`、`display: inline-flex`。
 - 不用 `float`。
-- 仅允许横向 `scroll-view scroll-x`，不依赖纵向滚动。
+- `scroll-view` 仅允许横向 `scroll-x`；`swiper` 仅允许横向轮播，不依赖纵向滚动。
 - 根节点不写 `height`、`min-height`、`max-height`。
 - `position: fixed`、`sticky` 不用于卡片结构。
 - 不写 `z-index`。

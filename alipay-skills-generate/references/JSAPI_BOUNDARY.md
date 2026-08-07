@@ -63,7 +63,7 @@ skill.registerAPI('apiName2', apiName2);
 
 ### 2.1 明确支持
 
-本节是原子接口上下文原有 `my.*` API 的精确 allowlist；未列出的 API 均按不支持处理。`my.openSetting` 是在静态规范之外保留的兼容例外。
+本节是原子接口上下文原有 `my.*` API 的精确 allowlist；未列出的 API 均按不支持处理。
 
 | 分类 | API |
 |------|-----|
@@ -74,11 +74,10 @@ skill.registerAPI('apiName2', apiName2);
 | 数据缓存 | `my.setStorage`、`my.setStorageSync`、`my.getStorage`、`my.getStorageSync`、`my.getStorageInfo`、`my.getStorageInfoSync`、`my.removeStorage`、`my.removeStorageSync`、`my.clearStorage`、`my.clearStorageSync` |
 | 位置与手机号 | `my.getLocation`、`my.openLocation`、`my.chooseLocation`、`my.getPhoneNumber` |
 | 拨打电话 | `my.makePhoneCall` |
-| 设置 | `my.getSetting`、`my.openSetting`（兼容例外） |
+| 设置 | `my.getSetting` |
 | 账号信息 | `my.getAccountInfoSync` |
 | 隐私信息授权 | `my.getPrivacySetting`、`my.openPrivacyContract` |
 | 图片视频 | `my.saveImageToPhotosAlbum` |
-| 支付 | `my.tradePay` |
 | 地址 | `my.chooseAddress`、`my.chooseInvoiceTitle` |
 | 扫码 | `my.scan` |
 
@@ -91,8 +90,9 @@ skill.registerAPI('apiName2', apiName2);
 | 上传下载 | `my.uploadFile`、`my.downloadFile` |
 | 交互反馈 | `my.showToast`、`my.hideToast` |
 | 旧版或未列明系统信息 | `my.getDeviceInfo`、`my.getWindowInfo`、`my.getSystemInfo` |
-| 分享、文件与授权 | `my.showSharePanel`、`my.openDocument`、`my.authorize` |
+| 分享、文件、设置与授权 | `my.showSharePanel`、`my.openDocument`、`my.openSetting`、`my.authorize` |
 | 图片视频 | `my.chooseImage`、`my.previewImage`、`my.generateImageFromCode`、`my.getImageInfo` |
+| 支付 | `my.tradePay` |
 | 订阅 | `my.requestSubscribeMessage` |
 | WiFi | `my.startWifi`、`my.getWifiList`、`my.getConnectedWifi`、`my.connectWifi`、`my.stopWifi`、`my.setWifiList` |
 | 振动 | `my.vibrate`、`my.vibrateShort`、`my.vibrateLong` |
@@ -107,7 +107,7 @@ skill.registerAPI('apiName2', apiName2);
 
 ### 3.1 原子组件明确支持
 
-本节是普通原子组件侧原有 `my.*` API 的精确 allowlist；未列出的 API 均按不支持处理。动态组件继承本节能力并按 §3.2 额外获得 `my.request`。`my.openSetting` 是在静态规范之外保留的兼容例外。
+本节是普通原子组件侧原有 `my.*` API 的精确 allowlist；未列出的 API 均按不支持处理。动态组件继承本节能力并按 §3.2 额外获得 `my.request` 和 `my.tradePay`。
 
 | 分类 | API |
 |------|-----|
@@ -117,7 +117,6 @@ skill.registerAPI('apiName2', apiName2);
 | 位置 | `my.openLocation` |
 | 交互反馈 | `my.showToast`、`my.hideToast` |
 | 拨打电话 | `my.makePhoneCall` |
-| 设置 | `my.openSetting`（兼容例外） |
 | 账号信息 | `my.getAccountInfoSync` |
 | 隐私信息授权 | `my.getPrivacySetting`、`my.openPrivacyContract` |
 | 图片视频 | `my.previewImage`、`my.generateImageFromCode` |
@@ -137,28 +136,30 @@ skill.registerAPI('apiName2', apiName2);
 | 分类 | API / 能力 |
 |------|------------|
 | 发起请求 | `my.request` |
+| 支付 | `my.tradePay` |
 | 定时器 | `setTimeout`、`clearTimeout`、`setInterval`、`clearInterval` |
 
-确需组件直接请求或使用定时器时，在对应 `components[]` 声明：
+确需组件直接请求、支付或使用定时器时，在对应 `components[]` 声明：
 
 ```json
 "permissions": {
   "scope.dynamic": {
-    "desc": "说明组件直接请求或定时器的具体业务用途"
+    "desc": "说明组件直接请求、支付或定时器的具体业务用途"
   }
 }
 ```
 
 约束：
-- `scope.dynamic` 是组件粒度权限；同一 Skill 内未声明的组件仍按 §3.1 判定，不得调用 `my.request` 或定时器。
-- `desc` 必须是非空业务说明，写清直接请求的数据和刷新触发方式，或定时器用途；不能只写「需要网络」「动态能力」。
-- 动态组件新增的 `my.*` 能力只有 `my.request`。`my.getAuthCode`、其他网络 API、上传下载及 §3.3 中的 API 仍不支持。
+- `scope.dynamic` 是组件粒度权限；同一 Skill 内未声明的组件仍按 §3.1 判定，不得调用 `my.request`、`my.tradePay` 或定时器。
+- `desc` 必须是非空业务说明，写清直接请求的数据和刷新触发方式、用户点击发起的具体支付流程或定时器用途；不能只写「需要网络」「动态能力」。
+- 动态组件新增的 `my.*` 能力只有 `my.request` 和 `my.tradePay`。`my.getAuthCode`、其他网络 API、上传下载及 §3.3 中的 API 仍不支持。
 - `my.request` 的技术可用不等于业务动作可直接执行；请求用途、鉴权可行性、数据边界和写操作策略仍须遵循 `UX_EXPERIENCE.md` 与 `SAFETY_POLICY.md`。
+- `my.tradePay` 只能在用户明确点击付款 CTA 的 tap handler 中调用。调用前必须展示来自最新可信结果的订单、商户和金额摘要，支付参数必须来自源码真实支付链路；不得由定时器、生命周期、Agent 自动调用或普通原子组件调用。支付结果和取消/失败分支按 `SAFETY_POLICY.md` 处理。
 - 动态组件可以直接或通过 `utils/` 业务函数间接调用 `my.request`，但必须按 §3.2.1 递归检查当前动作从组件 tap 出发的直接执行闭包；闭包中的任一依赖使用 §3.3 能力、接口注册上下文或接口私有凭证/模块状态时，整条链均不得在组件中使用。
 - 组件不得 import 原子接口 handler。Agent API 与动态组件可以复用全部传递依赖均受组件支持的 `utils/` 业务函数，以统一 URL、method、header、后端参数映射和响应信封；文件名或是否属于请求/鉴权封装本身不作为禁止依据。
 - 目录不承担运行时隔离；依赖闭包承担。继续使用扁平 `utils/` 即可：组件只能到达组件侧支持的依赖，API 可以额外依赖主动鉴权或接口侧工具。
 - 定时器回调不具备 tap 手势，不得在回调里主动 `ctx.sendFollowUpMessage(...)`；改为用户点击触发或由原子接口返回新结果。
-- 不得因为声明了 `scope.dynamic` 就推断 `my.request` 之外的额外 `my.*` 可用。
+- 不得因为声明了 `scope.dynamic` 就推断 `my.request`、`my.tradePay` 之外的额外 `my.*` 可用。
 
 ### 3.2.1 动作级鉴权路径判断
 
@@ -173,7 +174,7 @@ Gate C 的接口规格记录已有 session 执行路径、缺失或失效 sessio
 
 ### 3.3 原子组件与动态组件均不支持
 
-除 §3.1 和 §3.2 明确列出的能力及 `my.openSetting` 兼容例外外，其他 `my.*` API 均不支持。
+除 §3.1 和 §3.2 明确列出的能力外，其他 `my.*` API 均不支持。
 
 | 分类 | API |
 |------|-----|
@@ -183,10 +184,10 @@ Gate C 的接口规格记录已有 session 执行路径、缺失或失效 sessio
 | 上传下载 | `my.uploadFile`、`my.downloadFile` |
 | 旧版或未列明系统信息 | `my.getDeviceInfo`、`my.getWindowInfo`、`my.getSystemInfo` |
 | 位置与手机号 | `my.getLocation`、`my.chooseLocation`、`my.getPhoneNumber` |
-| 设置与授权 | `my.getSetting`、`my.authorize` |
+| 设置与授权 | `my.getSetting`、`my.openSetting`、`my.authorize` |
 | 分享与文件 | `my.showSharePanel`、`my.openDocument` |
 | 图片视频 | `my.chooseImage`、`my.saveImageToPhotosAlbum`、`my.getImageInfo` |
-| 支付订阅与地址 | `my.tradePay`、`my.requestSubscribeMessage`、`my.chooseAddress`、`my.chooseInvoiceTitle` |
+| 支付订阅与地址 | `my.requestSubscribeMessage`、`my.chooseAddress`、`my.chooseInvoiceTitle` |
 | WiFi | `my.startWifi`、`my.getWifiList`、`my.getConnectedWifi`、`my.connectWifi`、`my.stopWifi`、`my.setWifiList` |
 | 扫码 | `my.scan` |
 | 页面路由 | `my.navigateTo`、`my.redirectTo`、`my.navigateBack`、`my.switchTab`、`my.reLaunch` |
@@ -199,6 +200,8 @@ Gate C 的接口规格记录已有 session 执行路径、缺失或失效 sessio
 ### 3.4 Gate D 执行入口裁决
 
 Gate D 只依据 §3.2.1 的已有 session 执行路径裁决 `componentRuntime` 和 `uiEntry`。该路径的全部传递依赖均受组件支持，且请求契约已收口到共享 `utils/` 业务函数时，需要原位请求的动作必须使用动态组件 `uiEntry=my.request`。
+
+支付入口单独裁决：源码存在真实 `my.tradePay` 链路、最新可信结果提供订单/商户/金额摘要和全部支付参数、平台仍保留最终支付确认时，可使用动态组件 `uiEntry=tradePay`；必须由明确付款 CTA 的 tap handler 调用，并在回调后通过已注册查询 API 重查权威状态。任一条件不满足时使用 `detailPage` 或 `relatedPage`。
 
 项目或接口侧存在主动鉴权不构成否决证据。源码使用独立登录能力时，受保护业务 API 和动态组件都只通过统一请求层消费已有 session，主动鉴权仅由独立登录 API、登录卡片或登录页面负责。只有当前业务动作的源码执行链本身包含主动鉴权时，原子接口才迁移该链路后调用共享业务函数。组件的 import 闭包不得包含主动鉴权模块。
 
@@ -231,7 +234,7 @@ Gate D 只依据 §3.2.1 的已有 session 执行路径裁决 `componentRuntime`
 
 - API 在 §2、§3.1 或 §3.2 对应运行环境中明确支持；组件是否属于动态组件以自身 `permissions["scope.dynamic"]` 为准。
 - 若 API 需要用户点击触发（如组件侧 `vctx.openRelatedPage`、`vctx.openDetailPage`），必须在 tap 回调中调用。
-- `scope.dynamic` 只在原子组件能力上增加 `my.request` 和定时器，不开放其他 `my.*`。
+- `scope.dynamic` 只在原子组件能力上增加 `my.request`、`my.tradePay` 和定时器，不开放其他 `my.*`。
 
 ### 级别 2 — 需替代方案
 

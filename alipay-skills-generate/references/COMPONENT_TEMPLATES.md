@@ -23,9 +23,9 @@ loadTiming: Gate E
 
 ### 1.1 组件与事件
 
-- 支持 `view`、`text`、`image`、`button`、横向 `scroll-view`；`image` 必须声明 `mode`，`button` 禁止 `open-type`，`scroll-view` 必须声明 `scroll-x`。
-- 禁止 `swiper`、`input`、`textarea`、`form`、`web-view`、`picker` 和纵向滚动；输入、选择和长流程使用卡片选项、上行消息、半屏或原页面承接。
-- 事件只使用 `onTap` / `catchTap`，以及 `image` 的 `onLoad` / `onError`；禁止长按、触摸、显隐事件和其他未支持事件。
+- 基础组件支持 `view`、`text`、`image`、`button`、横向 `scroll-view`、`swiper`、`swiper-item`；虚拟组件 `block` 不受此列表限制。确需自定义组件时在 `usingComponents` 注册并确认目标路径存在。`image` 必须声明 `mode`，`button` 禁止 `open-type`，`scroll-view` 必须声明 `scroll-x`。
+- `swiper` 仅用于横向轮播，禁止 `vertical`、`adjust-vertical-height`、`disable-touch`、`onAnimationEnd` 和 `onTransition`。禁止 `input`、`textarea`、`form`、`web-view`、`picker` 和纵向滚动；输入、选择和长流程使用卡片选项、上行消息、半屏或原页面承接。
+- 事件只使用 `view` 的 `onTap` / `catchTap`、`image` 的 `onLoad` / `onError` 和 `swiper` 的 `onChange`；禁止长按、触摸、显隐事件和其他未支持事件。
 - AXML 根节点使用单一 `view`；所有文本和插值表达式放在叶子 `text` 中；`button` 文案也必须包在 `text` 中。
 - 每个可交互元素都要有明确出口；不存在可靠下一步时删除操作，不生成死按钮。
 
@@ -50,15 +50,16 @@ components/{name}/
 
 `Component({})` 顶层只放支付宝组件定义项。事件 handler、Result 处理、数据映射和本地状态函数全部放入 `methods`；否则 `this.xxx()` 可能不可用。
 
-默认原子组件不得调用 `my.request` 或 `my.getAuthCode`。只有 Gate D 已裁决 `componentRuntime=dynamic`、记录直接请求/定时器契约，并在当前组件声明 `permissions["scope.dynamic"]` 时，组件才能调用 `my.request` 或定时器；动态组件仍不得调用 `my.getAuthCode`、其他网络 API 或上传下载能力。
+默认原子组件不得调用 `my.request`、`my.tradePay` 或 `my.getAuthCode`。只有 Gate D 已裁决 `componentRuntime=dynamic`、记录直接请求/支付/定时器契约，并在当前组件声明 `permissions["scope.dynamic"]` 时，组件才能调用 `my.request`、`my.tradePay` 或定时器；动态组件仍不得调用 `my.getAuthCode`、其他网络 API 或上传下载能力。
 
-所有组件都不得 import 原子接口 handler。动态组件可以复用 `utils/` 中的业务和请求工具，但必须递归确认全部传递依赖均符合动态组件 JSAPI 边界；URL、method、header、后端参数映射和响应信封应收口到 `utils/` 业务函数，不得在组件与 API 中分别实现。同一操作存在 Agent API 时，两端共同调用该业务函数。R2 写请求由用户 tap 触发，R3 在展示具体确认信息后由确认 tap 触发，并处理防重复、服务端校准和失败恢复；R4 最终资金/身份动作不得直接请求。R1 使用 `localState`，不得用定时器发起写操作。
+所有组件都不得 import 原子接口 handler。动态组件可以复用 `utils/` 中的业务和请求工具，但必须递归确认全部传递依赖均符合动态组件 JSAPI 边界；URL、method、header、后端参数映射和响应信封应收口到 `utils/` 业务函数，不得在组件与 API 中分别实现。同一操作存在 Agent API 时，两端共同调用该业务函数。R2 写请求由用户 tap 触发，R3 在展示具体确认信息后由确认 tap 触发，并处理防重复、服务端校准和失败恢复；R4 最终身份或关键资料动作不得直接请求，支付仅可在满足 `SAFETY_POLICY.md` 的用户确认承接条件时由付款 CTA 调用 `my.tradePay`。R1 使用 `localState`，不得用定时器发起写操作。
 
-动态请求与定时器实现还必须满足：
+动态请求、支付与定时器实现还必须满足：
 
 - 直接请求结果更新组件 data，不伪装成原子接口 Result，也不写入 Agent 可见上行文本；写操作以响应或随后重查得到的服务端状态为准。
 - 使用请求中标记避免同一请求或动作并发重入；失败时解除标记、保留或恢复旧数据并展示可见错误或重试出口。
 - 保存 timer handle，在组件卸载时 clear；定时器回调不得发送需要 tap 手势的上行消息，也不得触发写请求。
+- `my.tradePay` 只放在明确付款 CTA 的 tap handler 中；付款前展示最新订单、商户、金额和后果摘要，支付参数取自源码真实链路，并处理用户取消、失败、结果未知和成功后的重查。
 
 ## §2 组件模式选择
 
@@ -97,9 +98,11 @@ Profile 只增加差异，不复制基础组件。
 
 ## §3 UI 执行入口
 
-每个操作必须采用体验决策记录中的 `uiEntry`：`localState`、`my.request`、`apiCall`、`followUpText`、`detailPage`、`relatedPage` 或 `none`。`agentEntry` 是 Agent 处理对应自然语言意图时首先调用的已注册 API，`agentMayExecute` 决定 Agent 是否可直接改变业务状态；最终动作由用户在页面完成时，`agentEntry` 仍应返回摘要和 CTA。
+每个操作必须采用体验决策记录中的 `uiEntry`：`localState`、`my.request`、`tradePay`、`apiCall`、`followUpText`、`detailPage`、`relatedPage` 或 `none`。`agentEntry` 是 Agent 处理对应自然语言意图时首先调用的已注册 API，`agentMayExecute` 决定 Agent 是否可直接改变业务状态；最终动作由用户点击平台支付或在页面完成时，`agentEntry` 仍应返回摘要和 CTA。
 
 Agent 入口与 UI 入口分别裁决。确定性操作需要在当前卡片原位执行，且请求实现及全部传递依赖符合动态组件边界时，使用 `uiEntry=my.request`，由组件调用收口请求契约的 `utils/` 业务函数；同一操作存在 Agent API 时共同复用，UI 不发送上行消息。请求链只能由接口侧安全执行、操作意图和参数完整且目标 API 已注册时使用 `apiCall`；需要补参、语义理解或跨能力编排时使用 `followUpText`。
+
+支付动作只有在源码存在真实 `my.tradePay` 链路、最新可信结果提供完整支付摘要和参数、平台仍会展示最终支付确认时，才使用动态组件 `uiEntry=tradePay`；必须由用户点击付款 CTA 触发。其余支付场景使用 `detailPage` 或 `relatedPage`。
 
 `uiEntry` 只描述动作如何执行，不描述点击区域或控件形态。先按源交互映射确定整项点击、局部图标、步进器、选项、Tab、开关或独立按钮等交互节点，再把执行入口绑定到对应节点；不得因存在 API 或出口就自动增加操作按钮。
 
@@ -417,15 +420,16 @@ vctx.expirePreviousCards();
 - [ ] 刷新失败保留旧数据、解除提交动画、锁定等价写操作并给出恢复出口。
 - [ ] 所有写操作都有防重复提交和错误恢复。
 - [ ] `apiCall` 中的 `api/call` 前有 `text`，API 名和参数与 `mcp.json` 契约一致，且没有让 Agent 再判断明确的 UI 意图。
-- [ ] Agent 入口和 UI 入口已分别裁决；总体范围内的用户意图有已注册 `agentEntry`，需要页面完成的动作未写成 `none`；`uiEntry=my.request` 仅用于需要原位执行且请求链的全部传递依赖均受组件支持的操作。
-- [ ] 普通组件未调用 `my.request`；动态组件已声明 `scope.dynamic`，请求与定时器均在 Gate D 契约范围内。
+- [ ] Agent 入口和 UI 入口已分别裁决；总体范围内的用户意图有已注册 `agentEntry`，需要页面完成的动作未写成 `none`；`uiEntry=my.request` 仅用于需要原位执行且请求链的全部传递依赖均受组件支持的操作，`uiEntry=tradePay` 仅用于满足支付严格契约的用户付款 CTA。
+- [ ] 普通组件未调用 `my.request` 或 `my.tradePay`；动态组件已声明 `scope.dynamic`，请求、支付与定时器均在 Gate D 契约范围内。
+- [ ] `my.tradePay` 仅由付款 CTA 的 tap handler 调用，支付摘要与参数来自最新可信结果，回调覆盖取消、失败、未知和成功后的权威状态重查。
 - [ ] 组件未调用 `my.getAuthCode`，未 import 原子接口 handler；动态组件所复用 `utils/` 的全部传递依赖均符合组件边界，且未用定时器发起写操作。
-- [ ] 组件及其依赖中的每个 `my.*`、`my.modelContext`、Context 和 ViewContext 调用都在 `JSAPI_BOUNDARY.md` 对应运行环境的精确 allowlist 中，或是唯一兼容例外 `my.openSetting`；未列出的 API、参数字段和调用形态未生成。
+- [ ] 组件及其依赖中的每个 `my.*`、`my.modelContext`、Context 和 ViewContext 调用都在 `JSAPI_BOUNDARY.md` 对应运行环境的精确 allowlist 中；未列出的 API、参数字段和调用形态未生成。
 - [ ] R1 使用 `localState`；请求链的全部传递依赖均受组件支持时，原位操作使用 `my.request`；只能由接口侧执行、意图和参数完整且目标 API 已注册时使用 `apiCall`，确需补参或推理时使用 `followUpText`。
 - [ ] R2 控件具有提交态和防重复触发，并具备服务端状态/Result 校准、失败恢复、旧卡过期和 Agent 后续重查策略。
 - [ ] 敏感原值未进入 `structuredContent`、上行文本或非必要参数。
 - [ ] 每个可交互元素都有合法出口；没有死按钮、猜测 API 或猜测路径。
-- [ ] AXML 文本位于叶子 `text`，未使用不支持的组件或事件。
+- [ ] AXML 文本位于叶子 `text`，未使用不支持的组件或事件；`swiper` 仅横向轮播且只绑定 `onChange`。
 - [ ] ACSS 来自设计规范与源样式迁移，没有照抄本文件的通用类名和视觉值。
 - [ ] 卡片不依赖纵向滚动；溢出内容有分页、半屏或原页面承接。
 - [ ] 资金确认、凭证详情和过期处理仅在契约明确需要时启用。

@@ -11,7 +11,7 @@ loadTiming: Gate C 仅使用 §2 风险等级表；Gate D/E 完整读取
 1. 按动作后果分级，不按业务域一刀切。交易链路中的购物车、下单、付款必须分别判断。
 2. 参数来源可靠是所有写操作的硬门槛。商品 ID、SKU、数量、订单 ID、金额、地址、手机号等关键参数必须可追溯。
 3. Agent 可以执行低风险、可撤销、非资金写操作；不得因为接口是 POST 或属于交易链路就自动降级。
-4. 资金最终划转、支付确认、转账确认、退款提交、提现、充值等动作不得由 Agent 自动完成；允许展示摘要和用户点击触发的付款/资金入口。
+4. 资金最终划转、支付确认、转账确认、退款提交、提现、充值等动作不得由 Agent 自动完成；允许展示摘要和用户点击触发的付款/资金入口。付款入口在源码存在真实 `my.tradePay` 链路、支付参数完整且平台保留最终确认时，可由动态组件的明确付款 CTA 调用 `my.tradePay`。
 5. JSAPI 能力边界仍以 `JSAPI_BOUNDARY.md` 为准。安全等级允许某动作时，还必须满足对应运行环境的 JSAPI 支持约束。
 6. 证据不足时按更高风险处理；无法确认参数、后果或承接页时降级为展示、半屏说明或 `relatedPage`。
 7. Agent 入口与 UI 入口分别裁决。确定性操作需要原位执行且已有 session 执行路径的请求实现及全部传递依赖符合动态组件边界时，必须使用 `my.request`；否则操作意图和参数完整且目标 API 已注册时使用 `apiCall`，需要补参或推理时使用 `followUpText`。R1 使用组件本地状态。具体入口选择遵循 `UX_EXPERIENCE.md §5.1`。
@@ -36,7 +36,7 @@ loadTiming: Gate C 仅使用 §2 风险等级表；Gate D/E 完整读取
 | `userCanPerform` | 用户是否仍可通过可靠的原页面、半屏或平台流程完成该目标 |
 | `agentEntry` | Agent 处理该自然语言意图时首先调用的已注册 API；可直接执行，也可返回确认或页面承接 CTA |
 | `agentMayExecute` | Agent 是否可以直接调用接口改变业务状态 |
-| `uiEntry` | UI 入口：`localState`/`my.request`/`apiCall(<apiName>)`/`detailPage`/`relatedPage`/`followUpText`/`none` |
+| `uiEntry` | UI 入口：`localState`/`my.request`/`tradePay`/`apiCall(<apiName>)`/`detailPage`/`relatedPage`/`followUpText`/`none` |
 | `confirmationRequired` | 执行或进入承接流程前是否需要展示具体确认信息 |
 | `userGestureRequired` | 是否必须由用户点击触发 |
 | `ctaRequired` | 当前结果是否必须提供清晰、可见的继续操作出口 |
@@ -45,7 +45,7 @@ loadTiming: Gate C 仅使用 §2 风险等级表；Gate D/E 完整读取
 
 `agentMayExecute=false` 不蕴含 `agentEntry=none` 或 `userCanPerform=false`。当动作是当前中间态的自然下一步，且用户仍可通过可靠流程完成时，只降级执行方式，不截断用户旅程：使用能返回最新摘要和确认或页面承接 CTA 的查询、详情或 handoff API 作为 `agentEntry`，相关 R3/R4 动作保留 CTA。只有动作与当前目标无关、`userCanPerform=false`，或 R5 且没有可靠 Agent/UI 承接路径时，才允许 `agentEntry=none` 或不提供 CTA，并记录理由。
 
-`agentMayExecute=true` 也不蕴含 UI 必须暴露同一动作。UI 入口按 `UX_EXPERIENCE.md §5.1` 独立裁决：需要原位执行且请求链的全部传递依赖均受组件支持时设置 `uiEntry=my.request`；只能由接口侧安全执行且操作意图和参数完整时设置 `uiEntry=apiCall(<apiName>)`；需要补参、理解或编排时设置 `uiEntry=followUpText`。R1 动作使用 `uiEntry=localState`。
+`agentMayExecute=true` 也不蕴含 UI 必须暴露同一动作。UI 入口按 `UX_EXPERIENCE.md §5.1` 独立裁决：需要原位执行且请求链的全部传递依赖均受组件支持时设置 `uiEntry=my.request`；只能由接口侧安全执行且操作意图和参数完整时设置 `uiEntry=apiCall(<apiName>)`；需要补参、理解或编排时设置 `uiEntry=followUpText`。R1 动作使用 `uiEntry=localState`。R4 付款的 `agentMayExecute` 仍为 false；满足动态支付严格契约时，用户点击 CTA 可独立使用 `uiEntry=tradePay` 进入平台确认。
 
 ### 2.2 不可逆能力默认收集边界
 
@@ -66,7 +66,7 @@ loadTiming: Gate C 仅使用 §2 风险等级表；Gate D/E 完整读取
 | 修改购物车数量、勾选、取消勾选、移出购物车 | R2 | 参数可靠时直接执行；执行后刷新摘要并提供修改/恢复/查看购物车出口 |
 | 清空购物车 | R3 | 批量且影响范围大，必须明确确认；确认信息包含数量和范围 |
 | 结算购物车、提交订单、下单 | R3 | 保留「去结算/确认下单」CTA；优先通过 `openDetailPage` 打开真实小程序页面，由用户在页内完成确认和下单；不得在 handoff 前预先创建订单 |
-| 付款、去支付 | R4 | 保留用户点击触发的付款 CTA；优先通过 `openDetailPage` 打开真实订单/支付前页面，由用户在页内完成支付，不得自动扣款或自动确认支付 |
+| 付款、去支付 | R4 | 保留用户点击触发的付款 CTA；源码存在真实 `my.tradePay` 链路、支付参数完整且平台保留最终确认时，可由动态组件 CTA 调用 `my.tradePay`，否则通过真实订单/支付前页面完成；不得自动扣款或自动确认支付 |
 | 退款、转账、充值、提现 | R4 | 展示摘要和用户点击触发的原页面/平台入口；不得自动提交资金动作 |
 | 取消订单 | R3 | 按业务后果判断；通常需要明确确认或交原页面承接 |
 | 修改地址、手机号、实名信息、收款账户 | R4 | 不自动执行；展示摘要并交原页面/平台流程 |
@@ -148,9 +148,11 @@ R3 确认要求：
 R4 用户显式承接要求：
 - Agent 不得自动调用扣款、支付确认、转账确认、退款提交、提现、充值等最终资金接口。
 - 可以展示付款/资金摘要和 CTA。CTA 必须由用户点击触发。
-- CTA 应优先使用 `detailPage` 打开源码真实订单/支付前页面，或承接到平台支付流程；半屏不可行时改用可靠 `relatedPage`，并由用户 tap 调用 `openRelatedPage()`。
+- 付款 CTA 只有在源码存在真实 `my.tradePay` 链路、最新可信结果提供全部支付参数，且平台仍展示最终支付确认时，才能由声明 `scope.dynamic` 的动态组件在 tap handler 中调用 `my.tradePay`；不得由 Agent、生命周期、定时器或普通组件调用。
+- 不满足动态支付条件时，CTA 使用 `detailPage` 打开源码真实订单/支付前页面，或承接到平台支付流程；半屏不可行时改用可靠 `relatedPage`，并由用户 tap 调用 `openRelatedPage()`。
 - 摘要至少展示金额、商品或服务、商户/收款方、订单号或业务号；缺失关键字段时不得生成付款 CTA。
 - 如果打开入口后会自动免密扣款、自动代扣或无平台/原页面二次确认，则不得生成该入口，改为 `relatedPage` 或说明。
+- `my.tradePay` 回调必须区分成功、用户取消、明确失败和结果未知；任何回调都不能仅凭客户端结果宣称订单已支付，成功或不确定后调用已注册订单查询 API 获取权威状态，失败/取消保留可重试或原页面出口。
 
 handoffOnly 规则：
 - handoffOnly 表示 Agent 只提供摘要、原因、`detailPage`、`relatedPage`、`relatedQuery` 或 `followUpText`。
@@ -195,7 +197,7 @@ handoffOnly 规则：
 - `userCanPerform`：用户是否仍可通过可靠流程完成目标
 - `agentEntry`：Agent 处理该自然语言意图时首先调用的已注册 API；直接执行、返回确认或页面承接 CTA 均可，仅无可靠 Agent 承接路径时为 none
 - `agentMayExecute`：Agent 是否可直接执行该动作
-- `uiEntry`：localState/my.request/apiCall(<apiName>)/detailPage/relatedPage/followUpText/none
+- `uiEntry`：localState/my.request/tradePay/apiCall(<apiName>)/detailPage/relatedPage/followUpText/none
 - `parameterProvenance`：关键参数来源和源码证据
 - `confirmationRequired`：是否需要确认
 - `userGestureRequired`：是否必须用户点击触发

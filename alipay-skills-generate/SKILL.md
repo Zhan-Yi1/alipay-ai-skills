@@ -70,14 +70,15 @@ Gate C 记录源码执行链中实际出现的 JSAPI、调用条件和可达依�
 
 ### 约束 D — 组件约束
 
-1. 仅允许使用：`view`, `text`, `image`, `button`, `scroll-view`
+1. 基础组件仅允许使用：`view`, `text`, `image`, `button`, `scroll-view`, `swiper`, `swiper-item`；虚拟组件 `block` 不受此列表限制。确需自定义组件时必须在 `usingComponents` 注册且目标路径存在，并继续满足 Skill 目录与依赖边界
 2. 所有文本和 `{{字段}}` 必须包裹在 `text` 内
 3. `<text>` 是叶子节点，**禁止嵌套任何子元素**（包括 `<text>` 自身）
 4. button 禁止 `open-type` 属性
-5. 事件绑定仅支持 `onTap` / `catchTap`，以及 `image` 的 `onLoad` / `onError`
+5. 事件绑定仅支持 `view` 的 `onTap` / `catchTap`、`image` 的 `onLoad` / `onError`，以及 `swiper` 的 `onChange`
 6. 组件 JSON 必须包含 `"styleIsolation": "apply-shared"`
 7. 组件 AXML 根节点必须是单一 `<view>`
 8. `scroll-view` 仅允许横向滚动，必须显式声明 `scroll-x`，禁止 `scroll-y="true"` 或纵向滚动
+9. `swiper` 仅允许横向轮播，禁止 `vertical`、`adjust-vertical-height`、`disable-touch`、`onAnimationEnd` 和 `onTransition`
 
 ## 约束 E — 子 Agent 分析路由
 
@@ -321,15 +322,20 @@ Gate C 记录源码执行链中实际出现的 JSAPI、调用条件和可达依�
 3. 当一个动作消费另一个能力的结果时，在现有 API 依赖图中记录生产接口、消费接口和真实传递字段，并在总体用户动线中连接两个步骤。生产结果存在判别字段时，对每个源码可达判别值分别记录消费实现和真实传递字段；只有每个值都有源码支持的实现、完整参数路径和对应 Agent 能力时才算闭合。事实不足时回 Gate C 补充。
 4. Gate A 明确要求由 Agent 返回业务结果的查询或详情能力，不能以 `relatedPage` 或 `detailPage` 代替缺失的 Agent 调用链。总体范围内用户可表达的动作都必须有自然语言可达的 Agent 处理入口；最终动作必须由用户在页面完成时，入口应调用能返回对应结果和 CTA 的查询、详情或 handoff API，而不是直接记为 `none`。某个判别分支缺少实现或字段来源时，定向回 Gate C 补该分支；仍无可调用实现时，向用户确认是否接受页面承接，不得静默缩减能力范围。
 5. Gate B.5 默认排除的不可逆动作不进入原子接口清单和 API 依赖图。在它是现有安全结果的自然下一步且源码存在可靠页面时，可由查询、详情或 handoff API 返回原页面 CTA；没有安全 Agent 承接能力时才设置 `agentEntry=none`。用户明确要求纳入的不可逆动作按实际后果继续执行 R3/R4/R5 裁决，不因明确要求而放宽安全等级。
+6. 对业务确实适用且有源码/API 证据的对话模式逐项闭合：模糊意图如何澄清或推荐、规格/时间/地点等字段如何用自然语言修改、历史记录或个人资产如何查询后继续操作、订单或服务进程如何重新查询或动态更新。纯工具型或源码不支持的模式明确记为不适用，不得为通过检查编造能力。
 
 **D.2 接口字段设计**：
 
 每条接口含：
 - `name`：lowerCamelCase，动作+业务对象（如 `getOrderList`），Skill name 用 `^[a-z][a-z0-9-]{1,39}$`
-- `description`：30-80 字（硬上限 120 中文字符或 240 字节），格式 `{动作}{业务对象}。当用户{触发条件}时使用；不用于{不适用场景}。`
-- `inputSchema`：仅 Agent 需从用户获取的参数；`required` 表示 Agent 可安全调用该接口所必需的字段集合，不是后端接口最低必需字段；ID 字段 description 必须声明取值来源接口，禁止模型编造。**所有 description 字符串禁止中文引号 `""''`，用直角引号「」或顿号替代**（如：用户说「紧急」「重要」映射为高，「一般」映射为中）
+- `description`：30-80 字（硬上限 120 中文字符或 240 字节）。首句用 `{动作}{具体业务对象}` 说明接口是什么，再写 `当用户{触发条件}时使用；不用于{不适用场景}`；不得以入参维度开头，不写内部请求、鉴权或处理流程，不与同 Skill 其他接口形成包含或重叠职责
+- `inputSchema`：仅 Agent 需从用户获取的参数；`required` 表示 Agent 可安全调用该接口所必需的字段集合，不是后端接口最低必需字段。每个输入字段都写能指导填参的 description：普通字段如需举例，提供多个不同样本并说明用户未提供时的处理；ID 字段明确上游接口和字段路径，禁止从自然语言推断或使用示例值。**所有 description 字符串禁止中文引号 `""''`，用直角引号「」或顿号替代**（如：用户说「紧急」「重要」映射为高，「一般」映射为中）
 - `outputSchema`：对应 structuredContent 结构；后续组件、API、SKILL.md 示例或多轮调用会消费的字段必须声明到可消费字段层级
 - `_meta.ui.componentPath`：**可选**，格式固定为 `components/xxx/index`；纯操作型/中间态可省
+
+用户可控字段存在合理静态边界时必须写入 JSON Schema：自由文本使用 `minLength`/`maxLength`，金额、数量、固定时间范围等使用 `minimum`/`maximum` 或等价约束；固定枚举由 `enum` 约束。无法预知合理上限的分页/批量参数和完全由可信上下文派生的只读内部参数不强行拍固定上限，但必须由后端限制或实现分批处理。
+
+`inputSchema` 禁止暴露 `apiKey`、`secret`、`token`、`password`、`accessKey` 等凭据字段。鉴权凭据只能由源码确认的 storage、请求封装或接口私有安全上下文读取，不能让 Agent 或用户传入。
 
 `inputSchema.required` 必须包含：
 - 业务必需字段：后端接口或业务逻辑运行必需
@@ -404,10 +410,14 @@ Gate E 以一个 Skill 目录为执行单位，并严格按 `design.md` 的实�
 
 - `apis[]`：每个接口的 name/description/inputSchema/outputSchema/_meta.ui.componentPath
 - `components[]`：每个组件的 path/relatedPage/expirable/expiredText/permissions
-- 仅当体验决策已裁决组件需要直接 `my.request` 或定时器时声明 `scope.dynamic`，`desc` 必须写清具体业务用途；该权限不开放组件侧 `my.getAuthCode` 或其他未支持 API
+- 仅当体验决策已裁决组件需要直接 `my.request`、`my.tradePay` 或定时器时声明 `scope.dynamic`，`desc` 必须写清具体业务用途；该权限不开放组件侧 `my.getAuthCode` 或其他未支持 API
 - Gate B.5 默认排除的能力不得出现在 `apis[]`、`index.js` 注册、`apis/*.js`、组件直接请求或 `api/call` 中；业务 `SKILL.md` 仅在拒绝边界说明应前往原页面，或引用已设计的安全承接入口
 
 再按 [CODE_TEMPLATES.md §5](references/CODE_TEMPLATES.md) 生成业务 `SKILL.md`。内容必须覆盖触发边界、拒绝边界、接口选择、参数抽取、总体用户动线中的本 Skill 步骤、执行 SOP、页面承接后的继续方式、异常出口、结果处理和示例，并以 Gate D 设计为依据。
+
+业务 `SKILL.md` 的唯一读者是 Agent：只写会改变其理解、接口选择、参数提取、分支决策或用户回应的内容。接口本身的功能和适用边界只在 `mcp.json#apis[].description` 完整定义，业务 `SKILL.md` 的工具清单只写前置条件与上下游关系；跨接口规则写在业务 `SKILL.md`。禁止写卡片布局、配色、字段位置等视觉设计稿，禁止写需求背景、验收、排期等项目管理内容，也禁止写宣传文案。
+
+业务 `SKILL.md` 还必须：明确列出支持与不支持范围且无矛盾；覆盖适用的模糊意图、自然语言修改、历史/资产和服务状态更新路径；所有已注册 API 都被引用且不引用未注册 API；每个正常、失败、查询为空、首次使用、无历史/缓存、未登录、缺少门店/商品/订单等前置状态以及取消/超时分支都有终止、补参、重试或恢复出口；工具无返回、查询失败或证据不足时要求如实告知，禁止编造业务结果；至少给出一个正常端到端示例、一个异常或空态示例和一个适用时的多轮示例。
 
 端到端示例必须展开完整 tool 调用参数。凡 `mcp.json#apis[].inputSchema.required` 中的字段，示例调用中必须出现；参数来自上游结果时，必须写明字段名或字段路径。禁止生成 `addCartItem(quantity=1)`、`receiveCoupon(confirmed=true)` 这类省略关键 ID 或上下文的示例。
 
@@ -424,7 +434,7 @@ Gate E 以一个 Skill 目录为执行单位，并严格按 `design.md` 的实�
 6. 数据加工（格式化/截取/敏感字段分层），同时保留体验决策和组件交互需要的业务分组、字段、状态与真实参数
 7. 返回标准 Result：`ok(text, structuredContent, meta)`
 8. catch 异常：返回 `fail(errorText)`
-9. 按 [JSAPI_BOUNDARY.md](references/JSAPI_BOUNDARY.md) 的原子接口精确 allowlist 检查注册入口、handler 及全部传递依赖中的 `my.*`、`my.modelContext` 和 Context 方法；除 `my.openSetting` 为明确兼容例外外，静态规范未列入原子接口环境的 API 或调用形态一律不得生成
+9. 按 [JSAPI_BOUNDARY.md](references/JSAPI_BOUNDARY.md) 的原子接口精确 allowlist 检查注册入口、handler 及全部传递依赖中的 `my.*`、`my.modelContext` 和 Context 方法；静态规范未列入原子接口环境的 API 或调用形态一律不得生成
 
 仅当状态变更请求已成功、后续刷新查询失败时，按 `SAFETY_POLICY.md` 返回 `operationSubmitted=true`、`refreshFailed=true` 和用户可见 `warningText`，不得按普通失败返回或返回普通成功加空列表。`refreshFailed=true` 必须蕴含 `operationSubmitted=true`，反向不成立；`operationSubmitted=true` 单独出现是正常已受理状态。组件必须保留旧业务数据、标记状态待确认并锁定等价写操作，只允许只读查看、重新查询或打开原页面确认。
 
@@ -447,9 +457,9 @@ Gate E 以一个 Skill 目录为执行单位，并严格按 `design.md` 的实�
 
 1. 紧邻每个组件写入前，重新读取该组件对应源页面和引用业务组件的相关 AXML、JS、ACSS 代码段，复核业务结构、字段顺序、点击区域、事件关系、状态和反馈；该复读不得被 E.0 的整体核对替代。
 2. 每个组件均生成完整的 `index.axml`、`index.acss`、`index.js`、`index.json` 四个文件，并使用 Gate D 已裁决的组件模式、字段、参数来源和 `uiEntry`。
-3. 动态组件只实现体验决策内的直接请求/定时器并声明 `scope.dynamic`，普通组件不得调用 `my.request`；组件不得 import 原子接口 handler，动态组件复用 `utils/` 时必须确认其全部传递依赖均符合组件运行时边界。
+3. 动态组件只实现体验决策内的直接请求、支付或定时器并声明 `scope.dynamic`；普通组件不得调用 `my.request` 或 `my.tradePay`。`my.tradePay` 只能由用户明确点击付款 CTA 后调用，并使用源码真实支付参数。组件不得 import 原子接口 handler，动态组件复用 `utils/` 时必须确认其全部传递依赖均符合组件运行时边界。
 4. 组件交互与状态遵循 [UX_EXPERIENCE.md](references/UX_EXPERIENCE.md) 和 [SAFETY_POLICY.md](references/SAFETY_POLICY.md)，样式遵循 [STYLE_MIGRATION.md](references/STYLE_MIGRATION.md)、[ATOMIC_COMPONENT_DESIGN.md](references/ATOMIC_COMPONENT_DESIGN.md) 和 [ACSS_SPEC.md](references/ACSS_SPEC.md)。组件的交互方式和文字优先参考小程序源页面。
-5. 按 [JSAPI_BOUNDARY.md](references/JSAPI_BOUNDARY.md) 的精确 allowlist 逐个检查当前组件及其依赖中的 `my.*`、`my.modelContext`、Context 和 ViewContext 调用；除 `my.openSetting` 为明确兼容例外外，静态规范未列入对应运行环境的 API、参数字段或调用形态一律不得生成。
+5. 按 [JSAPI_BOUNDARY.md](references/JSAPI_BOUNDARY.md) 的精确 allowlist 逐个检查当前组件及其依赖中的 `my.*`、`my.modelContext`、Context 和 ViewContext 调用；静态规范未列入对应运行环境的 API、参数字段或调用形态一律不得生成。
 
 **E.5 当前 Skill 的半屏与过期（按需）**：
 
@@ -477,11 +487,14 @@ Gate E 以一个 Skill 目录为执行单位，并严格按 `design.md` 的实�
 - 全部 Skill 的最终 `mcp.json`、业务 `SKILL.md` 和依赖关系确定后，再生成或更新项目级全局提示词文件；缺少 `agent.instruction` 时默认创建项目根目录 `AGENTS.md`，并设置 `agent.instruction: "AGENTS.md"`
 - 已有 `agent.instruction` 且目标文件存在时保留其路径和与本次生成无关的既有规则，仅更新受本次 Skill 变更影响的服务范围、路由与协作内容；字段存在但文件缺失时在该相对路径创建文件，不另设第二份全局提示词
 - 全局提示词基于最终注册能力和总体用户动线生成，覆盖小程序服务范围、各 Skill 职责与触发边界、自然语言意图到 `agentEntry` 的路由、接口选择和调用顺序、跨 Skill 参数关系、页面承接及返回后的继续方式、默认排除的不可逆动作及其原页面边界、结果可信度与敏感信息规则、回答风格和猜你想问方向；不得引用未注册 Skill/API 或复制完整 schema
+- 全局提示词不得包含「忽略以上指令」「无视前面的规则」「你现在是」等覆盖模型基础行为的越狱式内容；只约束业务角色、事实来源和服务边界
+- 全局提示词只约束回答应包含的业务信息、真实性、语气和简洁度，不得硬性规定表格、JSON、固定标题等回复呈现格式
+- 全局提示词中每个 method 名必须与最终 `mcp.json#apis[].name` 逐字一致（含大小写）；写入后从全部最终 mcp.json 汇总名称并交叉比对
 - 全局提示词文件不超过 10000 字节；写入后逐项核对其中引用的 Skill/API 与最终 `app.json`、`mcp.json` 一致
 - `agent.skills[].path` 指向每个生成的 `skills/{skill-name}` 目录
 - `agent.skills[].path` 必须隶属于 `subPackages` 中某个分包（例如 `root: "skills"`），且该分包 `pages` 为空数组
 - `agent.skills[].name` 与 SKILL.md frontmatter name 一致
-- `agent.skills[].description` **必填**，建议 50-120 中文字符，硬上限 200 中文字符或 400 字节
+- `agent.skills[].description` **必填**，建议 50-120 中文字符，硬上限 200 中文字符或 400 字节；写明具体业务对象、核心能力、常见用户说法或触发词和至少一条不支持边界，避免「帮助使用小程序」等宽泛表述，并与其他 Skill description 做语义去重
 - `agent.instruction` **必填**，值为项目内全局提示词文件的相对路径
 - 保留已有 `agent.skills`，新增或更新本次生成的所有 Skill 项
 - `lazyCodeLoading` 与 `component2` 是接入前置项，缺失时记录为待补

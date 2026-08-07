@@ -116,6 +116,7 @@ loadTiming: Gate E
 |--------|----------|
 | 页面有纵向 scroll-view | 卡片展示核心字段，更多内容用半屏或 relatedPage |
 | 页面有横向 scroll-view | 仅保留 `<scroll-view scroll-x>`，禁止 `scroll-y` |
+| 页面有横向 swiper | 可保留横向 `swiper` / `swiper-item` 和 `onChange`；禁用纵向、自动高度、禁用触摸、动画结束和过渡事件 |
 | 页面有输入框 | 澄清组件字段行 + 半屏/上行消息 |
 | 页面有 picker | 澄清组件选择行 + 半屏/卡片内选项 |
 | 页面有弹窗 | 改为半屏或上行消息确认 |
