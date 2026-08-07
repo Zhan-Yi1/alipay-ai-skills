@@ -79,7 +79,7 @@
 | 图片视频 | [my.previewImage](https://opendocs.alipay.com/mini/api/media/image/my.previewimage) | 预览图片 | | 支持 | 支持 |
 | | [my.saveImageToPhotosAlbum](https://opendocs.alipay.com/mini/api/media/image/my.saveImagetophotosalbum) | 保存图片到相册 | 支持 | | |
 | | [my.generateImageFromCode](https://opendocs.alipay.com/mini/api/media/image/my.generateimagefromcode) | 根据内容生成图片 | | 支持 | 支持 |
-| 支付 | [my.tradePay](https://opendocs.alipay.com/mini/api/openapi-pay) | 发起支付 | 支持 | | |
+| 支付 | [my.tradePay](https://opendocs.alipay.com/mini/api/openapi-pay) | 发起支付 | | | 支持 |
 | 地址 | [my.chooseAddress](https://opendocs.alipay.com/mini/api/choose-address) | 选择收货地址 | 支持 | | |
 | | my.chooseInvoiceTitle | 选择发票抬头 | 支持 | | |
 | 扫码 | [my.scan](https://opendocs.alipay.com/mini/api/scan) | 扫码 | 支持 | | |
