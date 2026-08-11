@@ -32,7 +32,15 @@
 
 ## 快速开始
 
-### 1. 生成 Skills
+### 1. 安装 Skills
+
+在支付宝小程序项目目录中运行：
+
+```bash
+npx skills@latest add ant-mini-program/alipay-ai-skills
+```
+
+### 2. 生成 Skills
 
 在支持 Skills 的 Coding Agent 中输入：
 
@@ -51,7 +59,7 @@ Skill 会按 6 个 Gate 执行：需求澄清 → 项目扫描 → 源码执行�
 
 详见 [`alipay-skills-generate/SKILL.md`](./alipay-skills-generate/SKILL.md)。
 
-### 2. 静态评测 Skills
+### 3. 静态评测 Skills
 
 `alipay-skills-static-eval` 需要明确项目路径、报告路径、评测范围和并行度。建议一次性提供完整参数：
 
@@ -70,7 +78,3 @@ Skill 会执行：
 评测基于 `SKILL.md`、`mcp.json`、组件和关联 JavaScript 等源文件进行语义分析，不会运行项目代码。
 
 详见 [`alipay-skills-static-eval/SKILL.md`](./alipay-skills-static-eval/SKILL.md)。
-
-## License
-
-本项目基于 [Apache License 2.0](./LICENSE.txt) 开源。法律声明见 [`LEGAL.md`](./LEGAL.md)。
