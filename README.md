@@ -53,7 +53,7 @@ Skill 会按 6 个 Gate 执行：需求澄清 → 项目扫描 → 源码执行�
 - `skills/{skill-name}/`：`SKILL.md`、`mcp.json`、`index.js`、原子接口、原子组件和工具模块
 - `AGENTS.md`：项目级服务范围、Skill 路由与协作规则
 - `app.json`：`agent.skills` 与对应分包配置
-- `.alipay-mode-skills/`：源码分析、接口契约和设计过程产物
+- `.alipay-ai-skills/`：源码分析、接口契约和设计过程产物
 
 建议每次聚焦一组连续的业务场景，完成生成和校验后再增量扩展。
 
