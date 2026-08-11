@@ -46,7 +46,7 @@ function parseArgs(argv) {
   }
 
   if (!parsed.artifactsDir) {
-    parsed.artifactsDir = path.join(parsed.projectPath, ".alipay-mode-skills");
+    parsed.artifactsDir = path.join(parsed.projectPath, ".alipay-ai-skills");
   }
   return parsed;
 }
@@ -155,7 +155,7 @@ function runChecks(options) {
     check(
       `Gate C: interface-spec.<capability>.md (${specs.length} found)`,
       specs.length > 0,
-      "write at least one non-empty interface-spec.<capability>.md under .alipay-mode-skills/"
+      "write at least one non-empty interface-spec.<capability>.md under .alipay-ai-skills/"
     );
   }
 
@@ -163,7 +163,7 @@ function runChecks(options) {
     check(
       "Gate D: design.md",
       isNonEmptyFile(path.join(options.artifactsDir, "design.md")),
-      "write a non-empty design.md under .alipay-mode-skills/"
+      "write a non-empty design.md under .alipay-ai-skills/"
     );
   }
 

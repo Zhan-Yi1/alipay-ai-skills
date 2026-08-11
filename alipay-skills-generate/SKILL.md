@@ -89,7 +89,7 @@ Gate C 记录源码执行链中实际出现的 JSAPI、调用条件和可达依�
 3. 主 Agent 先按源界面、连续用户流程、共享上下文和接口依赖把目标能力归入分析场景组；分析场景组只限定源码读取范围，不预设最终 Skill 归属。每个场景组由一个场景分析 Agent 从索引中的真实入口追踪全部相关实现，按源码证据生成一个 `interface-spec.<scene>.md`。场景分析 Agent 不写 Skill 代码。
 4. 主 Agent 读取分析产物和参考规范，统一完成 `design.md`、全部 Skill、全局 instruction 文件和 `app.json` 集成；不为每个 Skill 启动实现 Agent。
 
-子 Agent 通过 `.alipay-mode-skills/` 下的文件交接，不在消息中传递源码原文。
+子 Agent 通过 `.alipay-ai-skills/` 下的文件交接，不在消息中传递源码原文。
 当前源界面中与用户总体目标能力对应的可见动作均进入场景分析；动作可能属于其他功能域时，记录其执行链和跨能力参数关系。可见动作的直接执行链递归追到请求、session、实际调用的 JSAPI、模块状态、刷新和失败分支，其他依赖按实际执行链局部追踪。
 
 小项目不启动上述分析 Agent，主 Agent 直接按现有 Gate B/C 规则完成相同的场景分组和局部源码分析，并为每个分析场景组生成同格式的 `interface-spec.<scene>.md`。
@@ -200,7 +200,7 @@ Gate C 记录源码执行链中实际出现的 JSAPI、调用条件和可达依�
 
 **B.2 鉴权逻辑扫描（必做）**：
 
-小项目由主 Agent 按本节提取鉴权事实。大项目按 [SUBAGENT_PROTOCOL.md](references/SUBAGENT_PROTOCOL.md) 启动一个鉴权提取 Agent 和一个鉴权核对 Agent：前者读取 `app.js`、请求封装、登录/签名文件和主包 storage 初始化逻辑，落盘 `.alipay-mode-skills/auth-spec.md` 与必要的 `.alipay-mode-skills/auth-spec.snippets.txt`；后者按来源文件和行号核对，输出 `PASS` 或差异清单。核对 Agent 不修改业务代码，也不重新扫描未引用文件。
+小项目由主 Agent 按本节提取鉴权事实。大项目按 [SUBAGENT_PROTOCOL.md](references/SUBAGENT_PROTOCOL.md) 启动一个鉴权提取 Agent 和一个鉴权核对 Agent：前者读取 `app.js`、请求封装、登录/签名文件和主包 storage 初始化逻辑，落盘 `.alipay-ai-skills/auth-spec.md` 与必要的 `.alipay-ai-skills/auth-spec.snippets.txt`；后者按来源文件和行号核对，输出 `PASS` 或差异清单。核对 Agent 不修改业务代码，也不重新扫描未引用文件。
 
 鉴权事实至少包括：
 1. token/session 存取 key（关键词 `getStorageSync` + `token`/`session`/`userId`）
@@ -377,7 +377,7 @@ Gate C 记录源码执行链中实际出现的 JSAPI、调用条件和可达依�
 - API 依赖图仅在接口间需要传递内部上下文时产出；storage key 命名统一 `skills_{skillName}_{dataName}`
 - 多个 Skill 之间只允许通过用户可审计的参数来源传递，不得依赖另一个 Skill 的私有模块变量
 - `design.md` 单列 Gate B.5 默认排除能力，记录功能名、源码位置、排除原因和可靠原页面；不得延续内部标记或补造直接 API
-- 上述设计产物全部完成后，按“总体用户动线 → 原子接口与依赖 → 排除能力 → 逐组件体验决策 → Skill 实现顺序”统一汇总并落盘非空 `.alipay-mode-skills/design.md`，再运行 `node scripts/check-artifacts.mjs <project-path> --gate D`
+- 上述设计产物全部完成后，按“总体用户动线 → 原子接口与依赖 → 排除能力 → 逐组件体验决策 → Skill 实现顺序”统一汇总并落盘非空 `.alipay-ai-skills/design.md`，再运行 `node scripts/check-artifacts.mjs <project-path> --gate D`
 
 ---
 

@@ -26,10 +26,10 @@
 
 ## 3. 共享产物
 
-大项目的分析结果统一写入源项目的 `.alipay-mode-skills/`：
+大项目的分析结果统一写入源项目的 `.alipay-ai-skills/`：
 
 ```text
-.alipay-mode-skills/
+.alipay-ai-skills/
   capability-index.json
   auth-spec.md
   auth-spec.snippets.txt
