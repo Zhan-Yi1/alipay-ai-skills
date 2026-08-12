@@ -78,3 +78,11 @@ Skill 会执行：
 评测基于 `SKILL.md`、`mcp.json`、组件和关联 JavaScript 等源文件进行语义分析，不会运行项目代码。
 
 详见 [`alipay-skills-static-eval/SKILL.md`](./alipay-skills-static-eval/SKILL.md)。
+
+## 效果说明
+我们使用本工具和某另一家公司的相似工具，分别基于支付宝真实对客小程序进行AI化改造，并从4个角度来评估改造效果。
+- **能力覆盖：**解释
+- **准入得分：**解释
+- **综合得分：**解释
+- **用户体验：**解释
+评估结果如下图：
